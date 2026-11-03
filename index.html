@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Slot Racer — South Beach</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,600;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="map"></div>
+    <div id="vignette"></div>
+    <div id="speedlines"></div>
+
+    <!-- Timing tower -->
+    <section id="timing" class="panel hud">
+        <div class="row head">
+            <span class="label">Lap</span><span id="lap-num" class="lapnum">–</span>
+        </div>
+        <div id="lap-time" class="big mono">0.000</div>
+        <div id="delta" class="delta mono"></div>
+        <div class="sectors">
+            <div class="sector" id="sec-0"><span>S1</span><b class="mono">–</b></div>
+            <div class="sector" id="sec-1"><span>S2</span><b class="mono">–</b></div>
+            <div class="sector" id="sec-2"><span>S3</span><b class="mono">–</b></div>
+        </div>
+        <div class="row"><span class="label">Last</span><span id="last-lap" class="mono">–:––.–––</span></div>
+        <div class="row"><span class="label">Best</span><span id="best-lap" class="mono best">–:––.–––</span></div>
+    </section>
+
+    <!-- Minimap + corner advisory -->
+    <section id="nav" class="panel hud">
+        <canvas id="minimap" width="200" height="200"></canvas>
+        <div id="advisory">
+            <div class="label">Next</div>
+            <div class="adv-row"><span id="adv-name" class="adv-name">T1</span><span id="adv-arrow" class="adv-arrow">↰</span></div>
+            <div class="adv-row small"><span id="adv-dist" class="mono">— m</span><span id="adv-speed" class="mono">— km/h</span></div>
+        </div>
+    </section>
+
+    <!-- Speed cluster -->
+    <section id="cluster" class="hud">
+        <div id="shift-lights"></div>
+        <div class="cluster-main panel">
+            <div class="pedal"><div id="brake-bar" class="bar brake"></div><span>BRK</span></div>
+            <div class="gear-box"><div class="label">Gear</div><div id="gear" class="gear">N</div></div>
+            <div class="speed-box">
+                <div id="speed" class="speed">0</div>
+                <div id="speed-unit" class="label">km/h</div>
+            </div>
+            <div class="grip-box">
+                <div class="label">Grip</div>
+                <div class="grip"><div id="grip-fill"></div><div class="grip-limit"></div></div>
+                <div id="grip-pct" class="mono small">0%</div>
+            </div>
+            <div class="pedal"><div id="throttle-bar" class="bar throttle"></div><span>THR</span></div>
+        </div>
+    </section>
+
+    <!-- Start lights -->
+    <div id="lights" class="hidden">
+        <div class="light"><i></i><i></i></div><div class="light"><i></i><i></i></div>
+        <div class="light"><i></i><i></i></div><div class="light"><i></i><i></i></div>
+        <div class="light"><i></i><i></i></div>
+    </div>
+
+    <div id="message"></div>
+    <div id="toast"></div>
+
+    <!-- Touch zones (mobile) -->
+    <div id="touch" class="hud">
+        <div data-touch="brake" class="tz brake">BRAKE</div>
+        <div data-touch="throttle" class="tz throttle">THROTTLE</div>
+    </div>
+
+    <!-- Title -->
+    <section id="title" class="overlay">
+        <div class="title-card">
+            <div class="eyebrow">Real-world slot racing</div>
+            <h1>SLOT<span>RACER</span></h1>
+            <div id="track-name" class="track-name">South Beach Circuit</div>
+            <div id="track-meta" class="track-meta"></div>
+            <button id="start-btn" class="cta">Press <kbd>Space</kbd> to race</button>
+            <div class="controls">
+                <div><kbd>W</kbd><kbd>↑</kbd> Throttle</div>
+                <div><kbd>S</kbd><kbd>↓</kbd> Brake</div>
+                <div><kbd>C</kbd> Camera</div>
+                <div><kbd>R</kbd> Restart</div>
+                <div><kbd>G</kbd> Ghost</div>
+                <div><kbd>L</kbd> Time of day</div>
+                <div><kbd>H</kbd> Racing line</div>
+                <div><kbd>U</kbd> km/h · mph</div>
+                <div><kbd>M</kbd> Mute</div>
+                <div><kbd>Esc</kbd> Pause</div>
+            </div>
+            <p class="hint">No steering — you're in the slot. Your only job is speed. Carry too much into a corner and you'll fly off. Gamepad triggers work too.</p>
+        </div>
+    </section>
+
+    <section id="pause" class="overlay hidden">
+        <div class="title-card small">
+            <h2>Paused</h2>
+            <button id="resume-btn" class="cta">Press <kbd>Esc</kbd> to resume</button>
+            <button id="reset-best-btn" class="ghost-btn">Clear best lap</button>
+        </div>
+    </section>
+
+    <div id="loading">Loading map…</div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
