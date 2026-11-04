@@ -203,13 +203,29 @@ export function buildProps(city, { dist, nearJunction = () => false, lights = []
     });
 
     // ── Parked cars: kerb lane of streets, gaps for junctions, crossings and driveways ──
+    // Road centreline samples (every 4 m, tagged with their road) so a kerb spot next to
+    // another carriageway — the median of a divided road — can be skipped.
+    const CELL = 12, samples = new Map();
+    roads.forEach(({ r, s }, ri) => walk(r.coords, 0, () => 4, (x, y) => {
+        const k = `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
+        if (!samples.has(k)) samples.set(k, []);
+        samples.get(k).push([x, y, ri, s.w / 2]);
+    }));
+    const besideOtherRoad = (x, y, ri) => {
+        const gx = Math.floor(x / CELL), gy = Math.floor(y / CELL);
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+            for (const [sx, sy, rj, hw] of samples.get(`${gx + dx},${gy + dy}`) || []) {
+                if (rj !== ri && (sx - x) ** 2 + (sy - y) ** 2 < (hw + 4) ** 2) return true;
+            }
+        }
+        return false;
+    };
     const cars = [];
-    for (const { r, s } of roads) {
-        if (s.w < 9 || r.class === 'trunk' || r.class === 'motorway') continue;
+    roads.forEach(({ r, s }, ri) => {
+        if (s.w < 9 || r.class === 'trunk' || r.class === 'motorway') return;
         const seed = Math.round(r.coords[0][0] * 13 + r.coords[0][1] * 7) + 99;
         const R = rng(seed);
-        const sides = r.oneway ? [1, -1] : [1, -1];
-        for (const side of sides) {
+        for (const side of [1, -1]) {
             const occupancy = 0.45 + R() * 0.35;
             walk(r.coords, R() * 6, () => 6.2 + R() * 1.6, (x, y, tx, ty) => {
                 if (R() > occupancy || dist(x, y) > maxDist) return;
@@ -217,14 +233,14 @@ export function buildProps(city, { dist, nearJunction = () => false, lights = []
                 const px = x + ty * off * side, py = y - tx * off * side;
                 // keep clear of junctions (with margin), crossings, and the slot itself
                 for (const d of [-6, 0, 6]) if (nearJunction(px + tx * d, py + ty * d)) return;
-                if (crossGrid.near(px, py, 7) || dist(px, py) < 2.6) return;
+                if (crossGrid.near(px, py, 7) || dist(px, py) < 2.6 || besideOtherRoad(px, py, ri)) return;
                 const v = Math.floor(R() * 10) < 5 ? 0 : R() < 0.5 ? 1 : 2;
                 // parked with the flow of traffic on that side
                 const fwd = r.oneway || side > 0 ? 1 : -1;
                 cars.push({ x: px, y: py, h: Math.atan2(tx * fwd, ty * fwd) + (R() - 0.5) * 0.04, v, paint: PAINTS[Math.floor(R() * PAINTS.length)] });
             });
         }
-    }
+    });
     const bodyMat = new THREE.MeshPhysicalMaterial({ roughness: 0.35, metalness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.15 });
     const darkMat = new THREE.MeshStandardMaterial({ color: '#0d1116', roughness: 0.15, metalness: 0.5 });
     const col = new THREE.Color();
