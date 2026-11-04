@@ -72,11 +72,19 @@ tools/                headless checks (see below)
 ```bash
 node tools/track-report.mjs [sigma]   # length, corners (radius, apex speed), ideal lap
 node tools/sim.mjs [aggression]       # bot drives the ideal profile ×aggression → lap times, 0-100, de-slots
+node tools/smoke.mjs                  # browser smoke test (npm run smoke), see below
 ```
 
 At 1.0 the bot laps in 1:25.8, which matches the theoretical ideal. At 1.05 it laps in about 1:24.5 and stays on the track. At 1.08 it de-slots at every hairpin.
 
 In the browser console, `__slot` exposes `{ map, track, car, timer, camera, carLayer }`. Call `__slot.advance(seconds)` to step the game without requestAnimationFrame, which is useful when testing in a hidden tab.
+
+`tools/smoke.mjs` starts the Vite dev server, opens the game in headless Chromium (Playwright, not a project dependency: it must be resolvable from Node, e.g. on `NODE_PATH`) and checks that:
+- the Mapbox style and tiles load, and no Mapbox request fails;
+- the same bot as `sim.mjs` completes two laps via `__slot.advance()` with no de-slots, and the flying lap is within ±1.5 s of 1:25.8 (`SMOKE_EXPECT`, `SMOKE_TOL` override this);
+- there are no console errors or uncaught exceptions.
+
+It needs `VITE_MAPBOX_TOKEN` in the environment or `.env`, and exits non-zero on any failure. Set `SMOKE_SCREENSHOT=out.png` to save the final frame, and `CHROMIUM_PATH` to use a specific browser binary.
 
 ## Next steps
 1. **Feel pass on real hardware.** Tune `overloadBudget`, the keyboard ramp and the camera numbers after driving it at 60/120 Hz.
