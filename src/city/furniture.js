@@ -220,6 +220,7 @@ export function buildFurniture(city, { dist, nearJunction = () => false, maxDist
     return {
         group,
         counts: { lights: lights.length, signals: signals.length },
+        lightPositions: lights.map(l => [l.x, l.y]),
         onLight(env) {
             night = env.lights;
             lampMat.emissiveIntensity = 0.3 + 5 * env.lights;

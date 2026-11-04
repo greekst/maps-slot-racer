@@ -18,7 +18,7 @@ import { skyScene } from './sky-env.js';
 THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n\tvFogDepth = length( mvPosition.xyz );\n#endif';
 
 const SHADOW_EXTENT = 110;     // m half-width of the sun's shadow camera around the car
-const SHADOW_MAP = 4096;
+const QUALITY = { high: { shadow: 4096, props: true }, medium: { shadow: 2048, props: true }, low: { shadow: 0, props: false } };
 import { buildCar, poseCar } from './car-model.js';
 
 const LIGHTING = {
@@ -66,11 +66,30 @@ export class CarLayer {
         for (const fn of this.lightListeners) fn(this.env);
     }
 
+    // Graphics quality: 'high' (4K shadows, props), 'medium' (2K shadows), 'low' (no shadows/props)
+    setQuality(level) {
+        this.quality = QUALITY[level] ? level : 'high';
+        if (!this.sun) return this.quality;
+        const q = QUALITY[this.quality];
+        this.sun.castShadow = q.shadow > 0;
+        this.shadowCatcher.visible = q.shadow > 0;
+        if (q.shadow && this.sun.shadow.mapSize.x !== q.shadow) {
+            this.sun.shadow.mapSize.set(q.shadow, q.shadow);
+            this.sun.shadow.map?.dispose();
+            this.sun.shadow.map = null;
+        }
+        const props = this.world.getObjectByName('props');
+        if (props) props.visible = q.props;
+        this.map?.triggerRepaint();
+        return this.quality;
+    }
+
     // World-anchored content (city, street furniture) in track metres.
     // `onLight(env)` is called on every light-preset change.
     // `onFrame({ right, up, t, cam })` runs before each draw (billboards, animation).
     addWorld(obj, onLight, onFrame) {
         this.world.add(obj);
+        if (obj.name === 'props') obj.visible = (QUALITY[this.quality] || QUALITY.high).props;
         if (onLight) { this.lightListeners.push(onLight); onLight(this.env); }
         if (onFrame) this.frameListeners.push(onFrame);
         this.map?.triggerRepaint();
@@ -98,7 +117,7 @@ export class CarLayer {
         const sc = this.sun.shadow.camera;
         sc.left = sc.bottom = -SHADOW_EXTENT; sc.right = sc.top = SHADOW_EXTENT;
         sc.near = 1; sc.far = 900;
-        this.sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+        this.sun.shadow.mapSize.set(4096, 4096);
         this.sun.shadow.bias = -0.0004;
         this.sun.shadow.normalBias = 0.04;
         this.root.add(this.sun);
@@ -147,6 +166,7 @@ export class CarLayer {
         this.scene.environmentRotation.set(Math.PI / 2, 0, 0);
         this.setLightPreset(this.presetName || 'dusk');
         this.rebuildEnv(gl);
+        this.setQuality(this.quality || 'high');
     }
 
     // (Re)build the image-based lighting from the procedural sky for the current preset
@@ -177,7 +197,7 @@ export class CarLayer {
         this.car.position.set(0, 0, 0);
         this.world.position.set(-car.x, -car.y, 0);
         // Shadow camera follows the car, snapped to whole shadow texels so edges don't swim
-        const texel = (2 * SHADOW_EXTENT) / SHADOW_MAP;
+        const texel = (2 * SHADOW_EXTENT) / this.sun.shadow.mapSize.x;
         const sx = Math.round(car.x / texel) * texel - car.x, sy = Math.round(car.y / texel) * texel - car.y;
         this.sun.target.position.set(sx, sy, 0);
         this.sun.position.set(sx + this.sunVec.x * 400, sy + this.sunVec.y * 400, this.sunVec.z * 400);

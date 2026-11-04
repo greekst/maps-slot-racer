@@ -76,7 +76,7 @@ function sample(P, key, y) {
 }
 
 // Point on the section at angle a (0 = right side, π/2 = top)
-function sectionPoint(P, y, a) {
+export function sectionPoint(P, y, a) {
     const hw = sample(P, 'hw', y), bot = sample(P, 'bot', y), top = sample(P, 'top', y);
     const n = sample(P, 'n', y), tuck = sample(P, 'tuck', y);
     const c = Math.cos(a), s = Math.sin(a);
@@ -87,7 +87,7 @@ function sectionPoint(P, y, a) {
     return [x, y, z];
 }
 
-function loft(P, y0, y1, nY, nA) {
+export function loft(P, y0, y1, nY, nA) {
     const pos = [], idx = [];
     for (let i = 0; i <= nY; i++) {
         const y = y0 + (y1 - y0) * i / nY;

@@ -79,6 +79,8 @@ const map = new mapboxgl.Map({
 if (typeof map.transform?._maxZoom === 'number') map.transform._maxZoom = 28;
 
 const camera = new ChaseCamera(map, track);
+let savedQuality = null;
+try { savedQuality = localStorage.getItem('slotracer:quality'); } catch { /* storage unavailable */ }
 const carLayer = new CarLayer({
     track,
     getCar: () => car,
@@ -87,6 +89,7 @@ const carLayer = new CarLayer({
 });
 
 map.on('style.load', () => {
+    carLayer.quality = savedQuality || 'high';
     addTrackLayers(map, track);
     map.addLayer(carLayer);
     camera.update(0, car, { attract: true });
@@ -146,6 +149,13 @@ input.on('key', code => {
         case 'KeyH': showBand = !showBand; setRacingBandVisible(map, showBand); hud.toast(`Racing line ${showBand ? 'on' : 'off'}`); break;
         case 'KeyU': hud.setUnits(hud.units === 'kmh' ? 'mph' : 'kmh'); hud.toast(`Units: ${hud.unitLabel()}`); break;
         case 'KeyM': audio.setMuted(!audio.muted); hud.toast(audio.muted ? 'Sound off' : 'Sound on'); break;
+        case 'KeyQ': {
+            const order = ['high', 'medium', 'low'];
+            const q = carLayer.setQuality(order[(order.indexOf(carLayer.quality) + 1) % order.length]);
+            try { localStorage.setItem('slotracer:quality', q); } catch { /* storage unavailable */ }
+            hud.toast(`Graphics: ${q}`);
+            break;
+        }
         case 'KeyL': {
             const p = setLight(LIGHT_PRESETS[(lightIndex + 1) % LIGHT_PRESETS.length]);
             hud.toast(`Time of day: ${p}`);

@@ -23,6 +23,7 @@ If you use nvm and `npm` isn't on PATH, run `nvm use 24` first.
 | G | Ghost of your best lap on/off |
 | H | Speed-coloured racing band on/off |
 | L | Time of day: dusk, night, dawn, day |
+| Q | Graphics quality: high (4K shadows, palms and parked cars), medium (2K shadows), low (no shadows or props) |
 | U | km/h or mph |
 | M | Mute |
 | Esc / P | Pause |
@@ -76,6 +77,7 @@ Mapbox's HD roads and 3D facades don't cover Miami Beach (those tiles return 404
 - `data.js` decodes buildings, roads, sidewalks, crossings, traffic signals, bus stops and POIs, clipped to exact tile bounds, into track metres.
 - `buildings.js` turns about 3,100 footprints into one Three.js mesh. Standard's 3D buildings are switched off. A facade shader fits window bays to each wall and picks a style per building: pastel Art Deco low-rise, glass towers with balcony slabs, parking decks, or houses. Buildings near the circuit get storefronts, and windows light up at dusk and night.
 - `roads.js` draws asphalt, curbs, sidewalks, double-yellow centre lines, dashed lane lines, edge lines and zebra crosswalks as Mapbox line layers, trimmed back from intersections. Lane counts come from road class, because the data has none.
+- `props.js` plants swaying palms along the sidewalks and parks about 1,000 cars (sedans, hatchbacks, SUVs) at the kerbs, clear of junctions and crossings. Instances are split into 150 m chunks so off-screen ones are culled.
 - `furniture.js` adds instanced street lights (with glows and light pools at night) and mast-arm traffic signals at the real signal locations.
 
 Shadows come from the Mapbox Standard sun direction for each preset and fall on a shadow-catcher plane over Mapbox's ground. Fog uses true eye distance, so distant buildings fade with the map.
