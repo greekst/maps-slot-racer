@@ -1,5 +1,5 @@
 // ─── Mapbox ──────────────────────────────────────────────────────────────────
-export const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN; // set in .env (see .env.example)
+export const MAPBOX_ACCESS_TOKEN = import.meta.env?.VITE_MAPBOX_TOKEN; // set in .env (see .env.example)
 
 // ─── Car ─────────────────────────────────────────────────────────────────────
 // All values SI (kg, W, m, s). Tuned to a ~300 kW rear-drive GT car:
