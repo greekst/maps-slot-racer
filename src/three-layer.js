@@ -34,6 +34,8 @@ export class CarLayer {
         this._m = new THREE.Matrix4();
         this._l = new THREE.Matrix4();
         this.lightListeners = [];
+        this.frameListeners = [];
+        this._right = new THREE.Vector3(); this._up = new THREE.Vector3(); this._fwd = new THREE.Vector3();
     }
 
     setLightPreset(name) {
@@ -52,9 +54,11 @@ export class CarLayer {
 
     // World-anchored content (city, street furniture) in track metres.
     // `onLight(env)` is called on every light-preset change.
-    addWorld(obj, onLight) {
+    // `onFrame({ right, up, t, cam })` runs before each draw (billboards, animation).
+    addWorld(obj, onLight, onFrame) {
         this.world.add(obj);
         if (onLight) { this.lightListeners.push(onLight); onLight(this.env); }
+        if (onFrame) this.frameListeners.push(onFrame);
         this.map?.triggerRepaint();
     }
 
@@ -139,6 +143,14 @@ export class CarLayer {
         // Camera eye in scene coords so lighting/reflections use the real view vector
         const ex = cam.x - car.x, ey = cam.y - car.y, ez = cam.z;
         this.camera.position.set(ex, ey, ez);
+        if (this.frameListeners.length) {
+            const b = (cam.bearingDeg ?? 0) * Math.PI / 180, p = (cam.pitchDeg ?? 60) * Math.PI / 180;
+            this._fwd.set(Math.sin(b) * Math.sin(p), Math.cos(b) * Math.sin(p), -Math.cos(p));
+            this._right.set(Math.cos(b), -Math.sin(b), 0);
+            this._up.crossVectors(this._right, this._fwd);
+            const frame = { right: this._right, up: this._up, t: performance.now() / 1000, cam };
+            for (const fn of this.frameListeners) fn(frame);
+        }
         this.camera.updateMatrixWorld(true);
 
         this._m.fromArray(matrix);

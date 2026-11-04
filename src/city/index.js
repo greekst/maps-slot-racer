@@ -4,6 +4,7 @@
 import { loadCity, trackBBox } from './data.js';
 import { buildBuildings } from './buildings.js';
 import { buildRoadData, addRoadLayers } from './roads.js';
+import { buildFurniture } from './furniture.js';
 
 export const CITY_PAD = 700;   // metres of city loaded around the circuit's bounding box
 
@@ -40,7 +41,11 @@ export async function buildCity({ map, track, carLayer, token }) {
         buildings.material.userData.uniforms.uNight.value = env.lights;
     });
 
+    const furniture = buildFurniture(city, { dist, nearJunction: roads.near });
+    carLayer.addWorld(furniture.group, furniture.onLight, furniture.onFrame);
+
     const stats = {
+        ...furniture.counts,
         ms: Math.round(performance.now() - t0), tiles: city.tiles, buildings: city.buildings.length,
         roads: city.roads.length, marks: roads.marks.features.length, signals: city.signals.length, crosswalks: city.crosswalks.length,
         triangles: buildings.geometry.index.count / 3,

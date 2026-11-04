@@ -103,6 +103,7 @@ export class ChaseCamera {
         const [lng, lat] = this.track.proj.toLngLat(this.x, this.y);
         const opts = this.map.getFreeCameraOptions();
         opts.position = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], this.z);
+        this.pitchDeg = pitch; this.bearingDeg = bearing;
         opts.setPitchBearing(pitch, bearing);
         this.map.setFreeCameraOptions(opts);
     }
@@ -133,7 +134,8 @@ export class ChaseCamera {
         const [lng, lat] = this.track.proj.toLngLat(this.x, this.y);
         const opts = this.map.getFreeCameraOptions();
         opts.position = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], this.z);
-        opts.setPitchBearing(pitch, h * 180 / Math.PI);
+        this.pitchDeg = pitch; this.bearingDeg = h * 180 / Math.PI;
+        opts.setPitchBearing(pitch, this.bearingDeg);
         this.map.setFreeCameraOptions(opts);
     }
 

@@ -20,7 +20,7 @@ const ROADS = {
 };
 const LINK = { motorway_link: 'service', trunk_link: 'tertiary', primary_link: 'tertiary', secondary_link: 'tertiary', tertiary_link: 'street' };
 
-function spec(r) {
+export function spec(r) {
     if (r.structure === 'tunnel') return null;
     if (r.class === 'service' && /parking_aisle|drive_through|driveway/.test(r.type || '')) return { ...ROADS.service, w: 4 };
     return ROADS[LINK[r.class] || r.class] || null;
@@ -136,11 +136,11 @@ export function buildRoadData(city, proj) {
         else if (r.type === 'crossing') crossings.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: toLL(r.coords) } });
     }
     const fc = features => ({ type: 'FeatureCollection', features });
-    return { asphalt: fc(asphalt), marks: fc(marks), sidewalks: fc(sidewalks), crossings: fc(crossings) };
+    return { asphalt: fc(asphalt), marks: fc(marks), sidewalks: fc(sidewalks), crossings: fc(crossings), near, nodes };
 }
 
 export function addRoadLayers(map, data, lat, beforeId) {
-    for (const [id, d] of Object.entries(data)) map.addSource(`city-${id}`, { type: 'geojson', data: d });
+    for (const [id, d] of Object.entries(data)) if (d?.type === 'FeatureCollection') map.addSource(`city-${id}`, { type: 'geojson', data: d });
     const common = { type: 'line', slot: 'middle', layout: { 'line-cap': 'butt', 'line-join': 'round' } };
     const width = (base, extra = 0) => ['interpolate', ['exponential', 2], ['zoom'],
         12, ['*', ['+', ['get', 'w'], extra], base[0]], 24, ['*', ['+', ['get', 'w'], extra], base[1]]];
