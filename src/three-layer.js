@@ -12,13 +12,20 @@
 import * as THREE from 'three';
 import mapboxgl from 'mapbox-gl';
 import { skyScene } from './sky-env.js';
+
+// Three's fog uses view-space depth; our view matrix carries no rotation (Mapbox's
+// projection does), so use true eye distance instead.
+THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n\tvFogDepth = length( mvPosition.xyz );\n#endif';
+
+const SHADOW_EXTENT = 110;     // m half-width of the sun's shadow camera around the car
+const SHADOW_MAP = 4096;
 import { buildCar, poseCar } from './car-model.js';
 
 const LIGHTING = {
-    day:   { hemi: 2.6, hemiSky: '#e4f0ff', hemiGround: '#7a7266', sun: 3.2, sunColor: '#fff6e6', env: 1.0, night: false, lights: 0 },
-    dawn:  { hemi: 2.0, hemiSky: '#ffdcc8', hemiGround: '#4a3f3a', sun: 2.4, sunColor: '#ffc7a0', env: 0.9, night: false, lights: 0.35 },
-    dusk:  { hemi: 1.8, hemiSky: '#ffc2a8', hemiGround: '#3a3044', sun: 2.0, sunColor: '#ffab78', env: 0.9, night: true, lights: 0.7 },
-    night: { hemi: 1.5, hemiSky: '#8a9bd0', hemiGround: '#22222e', sun: 0.9, sunColor: '#a9bcff', env: 0.8, night: true, lights: 1 },
+    day:   { hemi: 2.6, hemiSky: '#e4f0ff', hemiGround: '#7a7266', sun: 3.2, sunColor: '#fff6e6', env: 1.0, night: false, lights: 0, sunDir: [180, 20], shadow: 0.42, fog: ['#dbe6f0', 350, 3200] },
+    dawn:  { hemi: 2.0, hemiSky: '#ffdcc8', hemiGround: '#4a3f3a', sun: 2.4, sunColor: '#ffc7a0', env: 0.9, night: false, lights: 0.35, sunDir: [120, 50], shadow: 0.35, fog: ['#e9b9a4', 300, 2800] },
+    dusk:  { hemi: 1.8, hemiSky: '#ffc2a8', hemiGround: '#3a3044', sun: 2.0, sunColor: '#ffab78', env: 0.9, night: true, lights: 0.7, sunDir: [240, 80], shadow: 0.3, fog: ['#c98f86', 300, 2600] },
+    night: { hemi: 1.5, hemiSky: '#8a9bd0', hemiGround: '#22222e', sun: 0.9, sunColor: '#a9bcff', env: 0.8, night: true, lights: 1, sunDir: [270, 20], shadow: 0.18, fog: ['#1a2242', 250, 2400] },
 };
 
 export class CarLayer {
@@ -48,6 +55,13 @@ export class CarLayer {
         this.hemi.groundColor.set(this.env.hemiGround);
         this.sun.intensity = this.env.sun;
         this.sun.color.set(this.env.sunColor);
+        // Mapbox light direction: azimuth clockwise from north, polar angle from zenith
+        const [az, pol] = this.env.sunDir.map(d => d * Math.PI / 180);
+        this.sunVec = new THREE.Vector3(Math.sin(az) * Math.sin(pol), Math.cos(az) * Math.sin(pol), Math.cos(pol));
+        this.shadowCatcher.material.opacity = this.env.shadow;
+        this.scene.fog.color.set(this.env.fog[0]);
+        this.scene.fog.near = this.env.fog[1];
+        this.scene.fog.far = this.env.fog[2];
         this.scene.environmentIntensity = this.env.env;
         for (const fn of this.lightListeners) fn(this.env);
     }
@@ -80,12 +94,42 @@ export class CarLayer {
         this.root.add(this.hemi);
         this.sun = new THREE.DirectionalLight('#ffffff', 1);
         this.sun.position.set(-30, 40, 60);
+        this.sun.castShadow = true;
+        const sc = this.sun.shadow.camera;
+        sc.left = sc.bottom = -SHADOW_EXTENT; sc.right = sc.top = SHADOW_EXTENT;
+        sc.near = 1; sc.far = 900;
+        this.sun.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+        this.sun.shadow.bias = -0.0004;
+        this.sun.shadow.normalBias = 0.04;
         this.root.add(this.sun);
         this.root.add(this.sun.target);
+        this.sunVec = new THREE.Vector3(0, 0, 1);
+        this.scene.fog = new THREE.Fog('#dbe6f0', 300, 3000);
+
+        // Mapbox draws the ground, so shadows land on an invisible catcher plane that only darkens
+        this.shadowCatcher = new THREE.Mesh(
+            new THREE.PlaneGeometry(SHADOW_EXTENT * 2.2, SHADOW_EXTENT * 2.2),
+            new THREE.ShadowMaterial({ opacity: 0.4, depthWrite: false, color: '#1a1f2e', fog: false }),
+        );
+        this.shadowCatcher.position.z = 0.03;
+        this.shadowCatcher.receiveShadow = true;
+        this.shadowCatcher.renderOrder = -1;
+        this.root.add(this.shadowCatcher);
+
+        // First object of the main (colour) pass: restores Mapbox's depth range after the
+        // shadow pass, which Three renders inside the same render() call.
+        const hookGeo = new THREE.BufferGeometry();
+        hookGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3));
+        const hook = new THREE.Mesh(hookGeo, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }));
+        hook.frustumCulled = false;
+        hook.renderOrder = -1e9;
+        hook.onBeforeRender = () => { if (this.depthRange) gl.depthRange(this.depthRange[0], this.depthRange[1]); };
+        this.scene.add(hook);
 
         this.car = buildCar({ paint: '#d7141a' });
         this.ghost = buildCar({ ghost: true });
         this.ghost.visible = false;
+        this.car.traverse(o => { if (o.isMesh && !o.material.transparent) o.castShadow = true; });
         this.root.add(this.car, this.ghost);
         this.world = new THREE.Group();
         this.world.name = 'world';
@@ -96,6 +140,8 @@ export class CarLayer {
         this.renderer.setPixelRatio(1);
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.0;
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         // The sky environment is Y-up; our world is Z-up (mercator, y south). Stand it upright.
         this.scene.environmentRotation.set(Math.PI / 2, 0, 0);
@@ -130,6 +176,12 @@ export class CarLayer {
 
         this.car.position.set(0, 0, 0);
         this.world.position.set(-car.x, -car.y, 0);
+        // Shadow camera follows the car, snapped to whole shadow texels so edges don't swim
+        const texel = (2 * SHADOW_EXTENT) / SHADOW_MAP;
+        const sx = Math.round(car.x / texel) * texel - car.x, sy = Math.round(car.y / texel) * texel - car.y;
+        this.sun.target.position.set(sx, sy, 0);
+        this.sun.position.set(sx + this.sunVec.x * 400, sy + this.sunVec.y * 400, this.sunVec.z * 400);
+        this.shadowCatcher.position.set(sx, sy, 0.03);
         poseCar(this.car, car, this.env);
         this.car.visible = car.opacity > 0.01 && !cam.hideCar;
 
@@ -165,7 +217,13 @@ export class CarLayer {
         const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
         this.renderer.resetState();
         this.renderer.setViewport(0, 0, w, h);
+        // Mapbox gives 3D layers a compressed depth range (e.g. [0, 0.96]). The shadow pass
+        // must write the full range or every comparison passes (no shadows); the main pass
+        // must keep Mapbox's range to sort against its trees. The hook switches between them.
+        this.depthRange = gl.getParameter(gl.DEPTH_RANGE);
+        gl.depthRange(0, 1);
         this.renderer.render(this.scene, this.camera);
+        gl.depthRange(this.depthRange[0], this.depthRange[1]);
         this.renderer.resetState();
         gl.viewport(0, 0, w, h);
         // Three leaves pixel-store flags set after texture uploads; Mapbox's 3D LUT upload rejects them

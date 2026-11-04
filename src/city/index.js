@@ -47,7 +47,7 @@ export async function buildCity({ map, track, carLayer, token }) {
     const stats = {
         ...furniture.counts,
         ms: Math.round(performance.now() - t0), tiles: city.tiles, buildings: city.buildings.length,
-        roads: city.roads.length, marks: roads.marks.features.length, signals: city.signals.length, crosswalks: city.crosswalks.length,
+        roads: city.roads.length, marks: roads.marks.features.length, crosswalks: city.crosswalks.length,
         triangles: buildings.geometry.index.count / 3,
     };
     console.info('[city]', stats);

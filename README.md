@@ -18,7 +18,7 @@ If you use nvm and `npm` isn't on PATH, run `nvm use 24` first.
 |---|---|
 | W / ↑ | Throttle (ramped, so taps feather it) |
 | S / ↓ | Brake |
-| C | Camera: Chase, Low Chase, Helicopter |
+| C | Camera: Chase, Low Chase, Helicopter, Bonnet (driver's eye), Bumper |
 | R | Restart from the grid |
 | G | Ghost of your best lap on/off |
 | H | Speed-coloured racing band on/off |
@@ -44,7 +44,9 @@ src/config.js         Mapbox token, car specs (SI units), physics rate, track sm
 src/track.js          lng/lat → metres, resample, Gaussian smoothing, heading and curvature, ideal speed profile
 src/car.js            SlotCar physics: slot mode, off-track free body, marshal recovery, cosmetic gearbox
 src/camera.js         chase camera via Mapbox FreeCamera API, speed-sensitive FOV, shake, crash cam
-src/three-layer.js    Mapbox custom layer that renders the car and ghost with Three.js
+src/three-layer.js    Mapbox custom layer that renders the car, ghost and city with Three.js (lights, shadows, fog)
+src/sky-env.js        procedural sky per light preset, used for reflections
+src/city/             street-level city built from Mapbox Streets vector tiles (see below)
 src/car-model.js      procedural GT car in real metres (+Y = nose, +Z = up)
 src/track-layers.js   slot, rails, speed-coloured band and chequered line as Mapbox layers
 src/timing.js         laps, 3 sectors, live delta, ghost recording (best lap is stored in localStorage)
@@ -65,7 +67,18 @@ tools/                headless checks (see below)
 - **Handedness:** Mapbox's projection matrix already mirrors handedness because mercator y points south. The y-flip therefore has to live in the projection, never in the scene graph. Otherwise Three culls the wrong faces and you see the inside of the car.
 - **Camera floor:** Mapbox floors the camera altitude at maxZoom's height (about 5 m at z24). `map.transform._maxZoom` is raised so a chase cam can sit at 1.2–2.6 m.
 - **FOV:** there's no public API for FOV, so `map.transform.fov` is set directly. It widens with speed.
+- **Depth range:** Mapbox gives 3D custom layers a compressed depth range. Three's shadow pass needs the full range, so `render()` switches to `[0, 1]` and a hook object restores Mapbox's range before the colour pass.
 - **GL state hand-back:** after Three renders we reset the viewport and the `UNPACK_FLIP_Y` / `PREMULTIPLY_ALPHA` flags. Without that reset, Mapbox's colour-grading LUT upload fails.
+
+### The city (src/city)
+Mapbox's HD roads and 3D facades don't cover Miami Beach (those tiles return 404), and Standard's own buildings are plain blocks. So at startup the game fetches the Mapbox Streets v8 tiles around the circuit (z16, about 35 tiles, with your token) and builds the street itself. Nothing from the tiles is stored in the repo.
+
+- `data.js` decodes buildings, roads, sidewalks, crossings, traffic signals, bus stops and POIs, clipped to exact tile bounds, into track metres.
+- `buildings.js` turns about 3,100 footprints into one Three.js mesh. Standard's 3D buildings are switched off. A facade shader fits window bays to each wall and picks a style per building: pastel Art Deco low-rise, glass towers with balcony slabs, parking decks, or houses. Buildings near the circuit get storefronts, and windows light up at dusk and night.
+- `roads.js` draws asphalt, curbs, sidewalks, double-yellow centre lines, dashed lane lines, edge lines and zebra crosswalks as Mapbox line layers, trimmed back from intersections. Lane counts come from road class, because the data has none.
+- `furniture.js` adds instanced street lights (with glows and light pools at night) and mast-arm traffic signals at the real signal locations.
+
+Shadows come from the Mapbox Standard sun direction for each preset and fall on a shadow-catcher plane over Mapbox's ground. Fog uses true eye distance, so distant buildings fade with the map.
 
 ## Tools
 
@@ -73,6 +86,7 @@ tools/                headless checks (see below)
 node tools/track-report.mjs [sigma]   # length, corners (radius, apex speed), ideal lap
 node tools/sim.mjs [aggression]       # bot drives the ideal profile ×aggression → lap times, 0-100, de-slots
 node tools/smoke.mjs                  # browser smoke test (npm run smoke), see below
+node tools/shots.mjs out --modes=0,2 --light=day,dusk   # screenshots at fixed spots on the circuit
 ```
 
 At 1.0 the bot laps in 1:25.8, which matches the theoretical ideal. At 1.05 it laps in about 1:24.5 and stays on the track. At 1.08 it de-slots at every hairpin.

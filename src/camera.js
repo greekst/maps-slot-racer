@@ -10,11 +10,11 @@ import { damp, lerpAngle, clamp } from './geo.js';
 // Onboard modes (`onboard: true`) ride on the car: `eye` = [forward, up] metres from the
 // car's ground centre, `look` = degrees below the horizon, `hideCar` hides the body.
 const MODES = [
-    { name: 'Bonnet', onboard: true, eye: [0.35, 1.24], look: 1.6, fov: 58, fovBoost: 12, hideCar: false },
-    { name: 'Bumper', onboard: true, eye: [2.45, 0.55], look: 1.2, fov: 62, fovBoost: 14, hideCar: true },
     { name: 'Chase',      dist: 8.6, height: 2.6, frame: 9.0, fov: 50, fovBoost: 14, pullPerMs: 0.035, dropPerMs: 0.005 },
     { name: 'Low Chase',  dist: 6.6, height: 1.25, frame: 6.0, fov: 54, fovBoost: 16, pullPerMs: 0.02, dropPerMs: 0.002 },
     { name: 'Helicopter', dist: 34,  height: 30,  frame: 4.0, fov: 40, fovBoost: 4, pullPerMs: 0.25, dropPerMs: 0 },
+    { name: 'Bonnet', onboard: true, eye: [0.35, 1.24], look: 1.6, fov: 58, fovBoost: 12, hideCar: false },
+    { name: 'Bumper', onboard: true, eye: [2.45, 0.55], look: 1.2, fov: 62, fovBoost: 14, hideCar: true },
 ];
 
 export class ChaseCamera {

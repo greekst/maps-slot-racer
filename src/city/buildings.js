@@ -100,6 +100,8 @@ export function buildBuildings(buildings, { busy = () => false } = {}) {
     const mesh = new THREE.Mesh(geo, material);
     mesh.frustumCulled = false;      // the scene is re-anchored each frame; bounds are huge anyway
     mesh.name = 'buildings';
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     return mesh;
 }
 

@@ -82,6 +82,10 @@ try {
         return { styleLoaded: m.isStyleLoaded(), tilesLoaded: m.areTilesLoaded(), trackLayers: false, layers: 0, webgl: !!m.painter?.context?.gl }; })()`);
     check(mapOk,
         `map loaded (style ${mapInfo.styleLoaded}, tiles ${mapInfo.tilesLoaded}, track+car layers ${mapInfo.trackLayers}, WebGL ${mapInfo.webgl})`);
+    // City dressing (src/city): buildings, road markings and street furniture built from vector tiles
+    const city = await page.evaluate(async () => (await window.__slot.city)?.stats ?? null).catch(() => null);
+    check(!!city && city.buildings > 500 && city.marks > 100 && city.lights > 50,
+        `city built${city ? ` (${city.buildings} buildings, ${city.marks} markings, ${city.lights} lights, ${city.signals} signals, ${city.ms} ms)` : ''}`);
     check(failedTiles.length === 0, `Mapbox requests ok${failedTiles.length ? ': ' + failedTiles.slice(0, 5).join('; ') : ''}`);
 
     if (!mapOk) {

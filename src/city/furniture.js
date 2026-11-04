@@ -136,6 +136,7 @@ export function buildFurniture(city, { dist, nearJunction = () => false, maxDist
     });
     for (const m of [poleMesh, lampMesh, glowMesh, poolMesh]) { m.frustumCulled = false; m.instanceMatrix.needsUpdate = true; }
     glowMesh.renderOrder = 3; poolMesh.renderOrder = 2;
+    poleMesh.castShadow = true;
     group.add(poleMesh, lampMesh, poolMesh, glowMesh);
 
     // ── Traffic signals: two mast arms per signalised junction, over the main road ──
@@ -193,6 +194,7 @@ export function buildFurniture(city, { dist, nearJunction = () => false, maxDist
         }
     });
     for (const m of [sigPole, sigHead, sigLamp]) { m.frustumCulled = false; m.instanceMatrix.needsUpdate = true; }
+    sigPole.castShadow = sigHead.castShadow = true;
     group.add(sigPole, sigHead, sigLamp);
 
     // Signal cycle: 0–0.42 green, 0.42–0.5 amber, 0.5–1 red (cross street offset by half)
