@@ -22,7 +22,7 @@ export function speedColor(v) {
 const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 
 // Line widths in Mapbox are pixels at the current zoom; convert real metres to a zoom curve.
-function metres(m, lat) {
+export function metres(m, lat) {
     const mpp = z => 40075016.686 * Math.cos(lat * Math.PI / 180) / (512 * 2 ** z);
     return ['interpolate', ['exponential', 2], ['zoom'], 12, m / mpp(12), 24, m / mpp(24)];
 }
@@ -45,15 +45,15 @@ export function addTrackLayers(map, track) {
     const common = { type: 'line', source: 'track', slot: 'middle', layout: { 'line-cap': 'round', 'line-join': 'round' } };
     map.addLayer({
         ...common, id: 'track-band',
-        paint: { 'line-width': metres(3.4, lat), 'line-gradient': gradient, 'line-opacity': 0.42, 'line-blur': metres(1.2, lat), 'line-emissive-strength': 1 },
+        paint: { 'line-width': metres(2.8, lat), 'line-gradient': gradient, 'line-opacity': 0.3, 'line-blur': metres(1.4, lat), 'line-emissive-strength': 1 },
     });
     map.addLayer({
         ...common, id: 'track-rails',
-        paint: { 'line-width': metres(0.7, lat), 'line-color': '#d49a5a', 'line-opacity': 0.95, 'line-emissive-strength': 0.9 },
+        paint: { 'line-width': metres(0.42, lat), 'line-color': '#c58c55', 'line-opacity': 0.9, 'line-emissive-strength': 0.6 },
     });
     map.addLayer({
         ...common, id: 'track-slot',
-        paint: { 'line-width': metres(0.22, lat), 'line-color': '#0c0c0e', 'line-emissive-strength': 0 },
+        paint: { 'line-width': metres(0.14, lat), 'line-color': '#0c0c0e', 'line-emissive-strength': 0 },
     });
 
     // Chequered start/finish: 2 rows × N squares across the road at s = 0

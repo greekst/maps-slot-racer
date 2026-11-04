@@ -19,6 +19,7 @@ import { LapTimer, formatTime } from './timing.js';
 import { Input } from './input.js';
 import { RaceAudio } from './audio.js';
 import { Hud } from './hud.js';
+import { buildCity } from './city/index.js';
 
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
@@ -56,6 +57,9 @@ const map = new mapboxgl.Map({
             showTransitLabels: false,
             showPlaceLabels: false,
             showRoadLabels: false,
+            // Our own buildings (src/city) replace Standard's plain extrusions
+            show3dBuildings: false,
+            show3dLandmarks: false,
         },
     },
     center: track.proj.toLngLat(start.x, start.y),
@@ -87,9 +91,20 @@ map.on('style.load', () => {
     map.addLayer(carLayer);
     camera.update(0, car, { attract: true });
     requestAnimationFrame(frame);
+    cityReady = buildCity({ map, track, carLayer, token: MAPBOX_ACCESS_TOKEN })
+        .catch(err => { console.warn('[city] failed, falling back to Standard buildings:', err); map.setConfigProperty('basemap', 'show3dBuildings', true); });
 });
+let cityReady = null;
 // The map never goes 'idle' (we repaint every frame), so drop the loader once tiles have arrived
 map.once('style.load', () => setTimeout(() => document.getElementById('loading').classList.add('done'), 1200));
+
+function setLight(p) {
+    lightIndex = Math.max(0, LIGHT_PRESETS.indexOf(p));
+    p = LIGHT_PRESETS[lightIndex];
+    map.setConfigProperty('basemap', 'lightPreset', p);
+    carLayer.setLightPreset(p);
+    return p;
+}
 
 // ── Controls ─────────────────────────────────────────────────────────────────
 function beginRace() {
@@ -132,10 +147,7 @@ input.on('key', code => {
         case 'KeyU': hud.setUnits(hud.units === 'kmh' ? 'mph' : 'kmh'); hud.toast(`Units: ${hud.unitLabel()}`); break;
         case 'KeyM': audio.setMuted(!audio.muted); hud.toast(audio.muted ? 'Sound off' : 'Sound on'); break;
         case 'KeyL': {
-            lightIndex = (lightIndex + 1) % LIGHT_PRESETS.length;
-            const p = LIGHT_PRESETS[lightIndex];
-            map.setConfigProperty('basemap', 'lightPreset', p);
-            carLayer.setLightPreset(p);
+            const p = setLight(LIGHT_PRESETS[(lightIndex + 1) % LIGHT_PRESETS.length]);
             hud.toast(`Time of day: ${p}`);
             break;
         }
@@ -234,6 +246,8 @@ document.body.classList.add('attract');
 // Debug handle for the console
 window.__slot = {
     map, track, car, timer, camera, carLayer, mapboxgl,
+    get city() { return cityReady; },
+    setLight,
     // Advance the game by `sec` seconds without rAF (for headless/hidden-tab testing)
     advance(sec, fps = 60) { for (let i = 0; i < sec * fps; i++) tick(1 / fps); },
 };

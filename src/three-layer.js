@@ -11,14 +11,14 @@
 
 import * as THREE from 'three';
 import mapboxgl from 'mapbox-gl';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { skyScene } from './sky-env.js';
 import { buildCar, poseCar } from './car-model.js';
 
 const LIGHTING = {
-    day:   { hemi: 2.6, hemiSky: '#e4f0ff', hemiGround: '#7a7266', sun: 3.2, sunColor: '#fff6e6', env: 0.35, night: false },
-    dawn:  { hemi: 2.0, hemiSky: '#ffdcc8', hemiGround: '#4a3f3a', sun: 2.4, sunColor: '#ffc7a0', env: 0.25, night: false },
-    dusk:  { hemi: 1.8, hemiSky: '#ffc2a8', hemiGround: '#3a3044', sun: 2.0, sunColor: '#ffab78', env: 0.2, night: true },
-    night: { hemi: 1.5, hemiSky: '#8a9bd0', hemiGround: '#22222e', sun: 0.9, sunColor: '#a9bcff', env: 0.1, night: true },
+    day:   { hemi: 2.6, hemiSky: '#e4f0ff', hemiGround: '#7a7266', sun: 3.2, sunColor: '#fff6e6', env: 1.0, night: false, lights: 0 },
+    dawn:  { hemi: 2.0, hemiSky: '#ffdcc8', hemiGround: '#4a3f3a', sun: 2.4, sunColor: '#ffc7a0', env: 0.9, night: false, lights: 0.35 },
+    dusk:  { hemi: 1.8, hemiSky: '#ffc2a8', hemiGround: '#3a3044', sun: 2.0, sunColor: '#ffab78', env: 0.9, night: true, lights: 0.7 },
+    night: { hemi: 1.5, hemiSky: '#8a9bd0', hemiGround: '#22222e', sun: 0.9, sunColor: '#a9bcff', env: 0.8, night: true, lights: 1 },
 };
 
 export class CarLayer {
@@ -33,10 +33,13 @@ export class CarLayer {
         this.env = LIGHTING.dusk;
         this._m = new THREE.Matrix4();
         this._l = new THREE.Matrix4();
+        this.lightListeners = [];
     }
 
     setLightPreset(name) {
-        this.env = LIGHTING[name] || LIGHTING.dusk;
+        this.presetName = LIGHTING[name] ? name : 'dusk';
+        this.env = LIGHTING[this.presetName];
+        this.envDirty = true;
         if (!this.scene) return;
         this.hemi.intensity = this.env.hemi;
         this.hemi.color.set(this.env.hemiSky);
@@ -44,6 +47,15 @@ export class CarLayer {
         this.sun.intensity = this.env.sun;
         this.sun.color.set(this.env.sunColor);
         this.scene.environmentIntensity = this.env.env;
+        for (const fn of this.lightListeners) fn(this.env);
+    }
+
+    // World-anchored content (city, street furniture) in track metres.
+    // `onLight(env)` is called on every light-preset change.
+    addWorld(obj, onLight) {
+        this.world.add(obj);
+        if (onLight) { this.lightListeners.push(onLight); onLight(this.env); }
+        this.map?.triggerRepaint();
     }
 
     onAdd(map, gl) {
@@ -71,6 +83,9 @@ export class CarLayer {
         this.ghost = buildCar({ ghost: true });
         this.ghost.visible = false;
         this.root.add(this.car, this.ghost);
+        this.world = new THREE.Group();
+        this.world.name = 'world';
+        this.root.add(this.world);
 
         this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
         this.renderer.autoClear = false;
@@ -78,20 +93,28 @@ export class CarLayer {
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.0;
 
-        const pmrem = new THREE.PMREMGenerator(this.renderer);
-        this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-        // RoomEnvironment is Y-up; our world is Z-up (mercator, y south). Stand it upright.
+        // The sky environment is Y-up; our world is Z-up (mercator, y south). Stand it upright.
         this.scene.environmentRotation.set(Math.PI / 2, 0, 0);
+        this.setLightPreset(this.presetName || 'dusk');
+        this.rebuildEnv(gl);
+    }
+
+    // (Re)build the image-based lighting from the procedural sky for the current preset
+    rebuildEnv(gl) {
+        this.envDirty = false;
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        const old = this.scene.environment;
+        this.scene.environment = pmrem.fromScene(skyScene(this.presetName), 0).texture;
+        old?.dispose();
         pmrem.dispose();
         this.renderer.setRenderTarget(null);
         this.renderer.resetState();
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
         gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-
-        this.setLightPreset(this.presetName || 'dusk');
     }
 
     render(gl, matrix) {
+        if (this.envDirty) this.rebuildEnv(gl);
         const car = this.getCar();
         const cam = this.getCamera();
         const proj = this.track.proj;
@@ -102,8 +125,9 @@ export class CarLayer {
         const s = merc.meterInMercatorCoordinateUnits();
 
         this.car.position.set(0, 0, 0);
+        this.world.position.set(-car.x, -car.y, 0);
         poseCar(this.car, car, this.env);
-        this.car.visible = car.opacity > 0.01;
+        this.car.visible = car.opacity > 0.01 && !cam.hideCar;
 
         const ghost = this.getGhost();
         this.ghost.visible = !!ghost;

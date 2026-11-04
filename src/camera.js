@@ -7,7 +7,11 @@ import { damp, lerpAngle, clamp } from './geo.js';
 // `frame` = how far below screen centre the car sits, in degrees of the (≈37° vertical) FOV.
 // `dist` is to the car's centre (the rear bumper is 2.3 m closer).
 // `fov`/`fovBoost` = vertical FOV at rest and extra degrees at ~300 km/h.
+// Onboard modes (`onboard: true`) ride on the car: `eye` = [forward, up] metres from the
+// car's ground centre, `look` = degrees below the horizon, `hideCar` hides the body.
 const MODES = [
+    { name: 'Bonnet', onboard: true, eye: [0.35, 1.24], look: 1.6, fov: 58, fovBoost: 12, hideCar: false },
+    { name: 'Bumper', onboard: true, eye: [2.45, 0.55], look: 1.2, fov: 62, fovBoost: 14, hideCar: true },
     { name: 'Chase',      dist: 8.6, height: 2.6, frame: 9.0, fov: 50, fovBoost: 14, pullPerMs: 0.035, dropPerMs: 0.005 },
     { name: 'Low Chase',  dist: 6.6, height: 1.25, frame: 6.0, fov: 54, fovBoost: 16, pullPerMs: 0.02, dropPerMs: 0.002 },
     { name: 'Helicopter', dist: 34,  height: 30,  frame: 4.0, fov: 40, fovBoost: 4, pullPerMs: 0.25, dropPerMs: 0 },
@@ -17,7 +21,7 @@ export class ChaseCamera {
     constructor(map, track) {
         this.map = map;
         this.track = track;
-        this.modeIndex = 0;
+        this.modeIndex = MODES.findIndex(m => m.name === 'Chase');
         this.heading = 0;
         this.x = 0; this.y = 0; this.z = 3;
         this.dist = MODES[0].dist;
@@ -45,6 +49,8 @@ export class ChaseCamera {
             this.dist = m.dist;
             this.initialised = true;
         }
+
+        if (m.onboard && !attract && car.mode === 'slot') return this.updateOnboard(dt, car, m);
 
         let heading, dist, height, frameDeg, fov;
         if (attract) {
@@ -100,6 +106,38 @@ export class ChaseCamera {
         opts.setPitchBearing(pitch, bearing);
         this.map.setFreeCameraOptions(opts);
     }
+
+    // Camera fixed to the car body: follows heading, roll and pitch, with a little
+    // high-frequency road buzz. Looks a couple of degrees below the horizon.
+    updateOnboard(dt, car, m) {
+        const v = car.v;
+        const fov = m.fov + m.fovBoost * clamp(v / 85, 0, 1) ** 1.5;
+        this.fov = this.fov == null ? fov : this.fov + (fov - this.fov) * damp(4, dt);
+        if (this.map.transform && Math.abs(this.map.transform.fov - this.fov) > 0.01) this.map.transform.fov = this.fov;
+
+        // heading with a very short lag so slot corrections don't jitter the horizon
+        this.heading = lerpAngle(this.heading, car.heading, damp(14, dt));
+        const h = this.heading, fx = Math.sin(h), fy = Math.cos(h);
+        const t = performance.now() / 1000;
+        const buzz = clamp(v / 80, 0, 1) * 0.006 + this.shake * 0.25;
+        const bz = (Math.sin(t * 53) + Math.sin(t * 31.7)) * buzz;
+        this.shake *= Math.exp(-3 * dt);
+
+        this.x = car.x + fx * m.eye[0];
+        this.y = car.y + fy * m.eye[0];
+        this.z = m.eye[1] + (car.z || 0) + bz;
+        // body pitch (nose dive under braking / squat under power) tilts the view
+        const bodyPitch = (car.pitch || 0) * 180 / Math.PI;
+        const pitch = clamp(90 - m.look + bodyPitch, 0, 85);
+
+        const [lng, lat] = this.track.proj.toLngLat(this.x, this.y);
+        const opts = this.map.getFreeCameraOptions();
+        opts.position = mapboxgl.MercatorCoordinate.fromLngLat([lng, lat], this.z);
+        opts.setPitchBearing(pitch, h * 180 / Math.PI);
+        this.map.setFreeCameraOptions(opts);
+    }
+
+    get hideCar() { return !!this.mode.hideCar && this.mode.onboard; }
 
     kick(amount) { this.shake = Math.max(this.shake, amount); }
 }
